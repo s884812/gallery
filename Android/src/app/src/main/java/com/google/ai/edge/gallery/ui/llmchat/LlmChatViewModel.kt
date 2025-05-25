@@ -25,6 +25,7 @@ import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.TASK_LLM_CHAT
 import com.google.ai.edge.gallery.data.TASK_LLM_ASK_IMAGE
 import com.google.ai.edge.gallery.data.Task
+import com.google.ai.edge.gallery.data.WebSearchService
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageBenchmarkLlmResult
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageLoading
 import com.google.ai.edge.gallery.ui.common.chat.ChatMessageText
@@ -46,10 +47,71 @@ private val STATS = listOf(
   Stat(id = "latency", label = "Latency", unit = "sec")
 )
 
-open class LlmChatViewModel(curTask: Task = TASK_LLM_CHAT) : ChatViewModel(task = curTask) {
+open class LlmChatViewModel(
+  curTask: Task = TASK_LLM_CHAT,
+  private val webSearchService: WebSearchService
+) : ChatViewModel(task = curTask) {
   fun generateResponse(model: Model, input: String, image: Bitmap? = null, onError: () -> Unit) {
     val accelerator = model.getStringConfigValue(key = ConfigKey.ACCELERATOR, defaultValue = "")
     viewModelScope.launch(Dispatchers.Default) {
+      // Web Search Logic
+      var augmentedInput = input
+      var searchPerformed = false
+      var searchSuccessful = false
+      var searchErrorOccurred = false
+
+      // Add search in-progress indicator
+      val searchIndicatorMessage = ChatMessageLoading(
+          text = "正在為您搜索網路獲取最新資訊...",
+          accelerator = accelerator,
+          side = ChatSide.AGENT
+      )
+      addMessage(model = model, message = searchIndicatorMessage)
+
+      try {
+        val tavilyResponse = webSearchService.search(apiKey = "YOUR_TAVILY_API_KEY_PLACEHOLDER", query = input)
+        searchPerformed = true
+
+        if (tavilyResponse != null) {
+          searchSuccessful = true
+          val searchAnswer = tavilyResponse.answer
+          val searchResults = tavilyResponse.results
+
+          if (!searchAnswer.isNullOrBlank()) {
+            augmentedInput = "Based on web search results, answer the following: \"${searchAnswer}\". The original question was: \"${input}\""
+          } else if (!searchResults.isNullOrEmpty()) {
+            val snippets = searchResults.take(2).joinToString(separator = "; ") { it.content }
+            if (snippets.isNotBlank()) {
+              augmentedInput = "Based on web search results, here are some relevant snippets: \"${snippets}\". The original question was: \"${input}\""
+            }
+          }
+        } else {
+          searchErrorOccurred = true
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "Web search call failed", e)
+        searchErrorOccurred = true
+      }
+
+      // Remove search in-progress indicator
+      val lastMessage = getLastMessage(model = model)
+      if (lastMessage == searchIndicatorMessage) {
+          removeLastMessage(model = model)
+      }
+
+      // Add search result status messages
+      if (searchErrorOccurred) {
+          addMessage(
+              model = model,
+              message = ChatMessageWarning(content = "網路搜索失敗，將嘗試使用模型知識回答。")
+          )
+      } else if (searchPerformed && !searchSuccessful) {
+          addMessage(
+              model = model,
+              message = ChatMessageWarning(content = "網路搜索未能找到相關資訊，將嘗試使用模型知識回答。")
+          )
+      }
+
       setInProgress(true)
       setPreparing(true)
 
@@ -67,9 +129,11 @@ open class LlmChatViewModel(curTask: Task = TASK_LLM_CHAT) : ChatViewModel(task 
 
       // Run inference.
       val instance = model.instance as LlmModelInstance
-      var prefillTokens = instance.session.sizeInTokens(input)
+      var prefillTokens = instance.session.sizeInTokens(augmentedInput)
       if (image != null) {
-        prefillTokens += 257
+        // Assuming image context is added separately and not part of the text prompt for token calculation here.
+        // If image contributes to text prompt for LLM, this might need adjustment or be handled by the model instance.
+        prefillTokens += 257 // This is a magic number, ensure it's correct for multimodal inputs.
       }
 
       var firstRun = true
@@ -82,7 +146,7 @@ open class LlmChatViewModel(curTask: Task = TASK_LLM_CHAT) : ChatViewModel(task 
 
       try {
         LlmChatModelHelper.runInference(model = model,
-          input = input,
+          input = augmentedInput, // Use augmentedInput here
           image = image,
           resultListener = { partialResult, done ->
             val curTs = System.currentTimeMillis()
@@ -241,8 +305,10 @@ open class LlmChatViewModel(curTask: Task = TASK_LLM_CHAT) : ChatViewModel(task 
     )
 
     // Re-generate the response automatically.
+    // The original triggeredMessage.content will go through the search logic again.
     generateResponse(model = model, input = triggeredMessage.content, onError = {})
   }
 }
 
-class LlmAskImageViewModel : LlmChatViewModel(curTask = TASK_LLM_ASK_IMAGE)
+class LlmAskImageViewModel(webSearchService: WebSearchService) :
+  LlmChatViewModel(curTask = TASK_LLM_ASK_IMAGE, webSearchService = webSearchService)
