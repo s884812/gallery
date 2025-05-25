@@ -61,15 +61,15 @@ open class LlmChatViewModel(
       var searchErrorOccurred = false
 
       // Add search in-progress indicator
-      val searchIndicatorMessage = ChatMessageLoading(
-          text = "正在為您搜索網路獲取最新資訊...",
-          accelerator = accelerator,
-          side = ChatSide.AGENT
+      val searchIndicatorMessage = ChatMessageText(
+        content = "正在為您搜索網路獲取最新資訊...",
+        side = ChatSide.AGENT,
+        accelerator = accelerator
       )
       addMessage(model = model, message = searchIndicatorMessage)
 
       try {
-        val tavilyResponse = webSearchService.search(apiKey = "YOUR_TAVILY_API_KEY_PLACEHOLDER", query = input)
+        val tavilyResponse = webSearchService.search(apiKey = "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", query = input)
         searchPerformed = true
 
         if (tavilyResponse != null) {
