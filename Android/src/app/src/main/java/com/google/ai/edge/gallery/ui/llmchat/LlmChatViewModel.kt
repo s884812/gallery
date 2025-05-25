@@ -69,7 +69,7 @@ open class LlmChatViewModel(
       addMessage(model = model, message = searchIndicatorMessage)
 
       try {
-        val tavilyResponse = webSearchService.search(apiKey = "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", query = input)
+        val tavilyResponse = webSearchService.search(apiKey = "YOUR_API_KEY", query = input)
         searchPerformed = true
 
         if (tavilyResponse != null) {
