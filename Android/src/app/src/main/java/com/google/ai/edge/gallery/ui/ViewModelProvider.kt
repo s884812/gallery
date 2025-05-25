@@ -22,6 +22,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.google.ai.edge.gallery.GalleryApplication
+import com.google.ai.edge.gallery.data.WebSearchService
 import com.google.ai.edge.gallery.ui.imageclassification.ImageClassificationViewModel
 import com.google.ai.edge.gallery.ui.imagegeneration.ImageGenerationViewModel
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatViewModel
@@ -32,6 +33,10 @@ import com.google.ai.edge.gallery.ui.textclassification.TextClassificationViewMo
 
 object ViewModelProvider {
   val Factory = viewModelFactory {
+    // Create an instance of WebSearchService
+    // This instance will be shared by ViewModels that need it.
+    val webSearchService = WebSearchService()
+
     // Initializer for ModelManagerViewModel.
     initializer {
       val downloadRepository = galleryApplication().container.downloadRepository
@@ -55,17 +60,21 @@ object ViewModelProvider {
 
     // Initializer for LlmChatViewModel.
     initializer {
-      LlmChatViewModel()
+      // Pass the WebSearchService instance
+      LlmChatViewModel(webSearchService = webSearchService)
     }
 
-    // Initializer for LlmSingleTurnViewModel..
+    // Initializer for LlmSingleTurnViewModel.
+    // Note: LlmSingleTurnViewModel's constructor was not modified in previous steps.
+    // If it also needs WebSearchService in the future, its initializer and constructor would need similar changes.
     initializer {
       LlmSingleTurnViewModel()
     }
 
     // Initializer for LlmAskImageViewModel.
     initializer {
-      LlmAskImageViewModel()
+      // Pass the WebSearchService instance
+      LlmAskImageViewModel(webSearchService = webSearchService)
     }
 
     // Initializer for ImageGenerationViewModel.
