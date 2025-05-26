@@ -22,6 +22,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.google.ai.edge.gallery.GalleryApplication
+import com.google.ai.edge.gallery.data.WebSearchService
 import com.google.ai.edge.gallery.ui.imageclassification.ImageClassificationViewModel
 import com.google.ai.edge.gallery.ui.imagegeneration.ImageGenerationViewModel
 import com.google.ai.edge.gallery.ui.llmchat.LlmChatViewModel
@@ -32,13 +33,19 @@ import com.google.ai.edge.gallery.ui.textclassification.TextClassificationViewMo
 
 object ViewModelProvider {
   val Factory = viewModelFactory {
+    // Create an instance of WebSearchService
+    // This instance will be shared by ViewModels that need it.
+    val webSearchService = WebSearchService()
+    // Get DataStoreRepository instance
+    val dataStoreRepository = galleryApplication().container.dataStoreRepository
+
     // Initializer for ModelManagerViewModel.
     initializer {
       val downloadRepository = galleryApplication().container.downloadRepository
-      val dataStoreRepository = galleryApplication().container.dataStoreRepository
+      // val dataStoreRepository = galleryApplication().container.dataStoreRepository // Already got it above
       ModelManagerViewModel(
         downloadRepository = downloadRepository,
-        dataStoreRepository = dataStoreRepository,
+        dataStoreRepository = dataStoreRepository, // Use the shared instance
         context = galleryApplication().container.context,
       )
     }
@@ -55,17 +62,25 @@ object ViewModelProvider {
 
     // Initializer for LlmChatViewModel.
     initializer {
-      LlmChatViewModel()
+      LlmChatViewModel(
+          webSearchService = webSearchService,
+          dataStoreRepository = dataStoreRepository // Pass it here
+      )
     }
 
-    // Initializer for LlmSingleTurnViewModel..
+    // Initializer for LlmSingleTurnViewModel.
+    // Note: LlmSingleTurnViewModel's constructor was not modified in previous steps.
+    // If it also needs WebSearchService in the future, its initializer and constructor would need similar changes.
     initializer {
       LlmSingleTurnViewModel()
     }
 
     // Initializer for LlmAskImageViewModel.
     initializer {
-      LlmAskImageViewModel()
+      LlmAskImageViewModel(
+          webSearchService = webSearchService,
+          dataStoreRepository = dataStoreRepository // Pass it here
+      )
     }
 
     // Initializer for ImageGenerationViewModel.

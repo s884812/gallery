@@ -55,6 +55,7 @@ import com.google.ai.edge.gallery.ui.llmchat.createLlmChatConfigs
 import com.google.ai.edge.gallery.ui.textclassification.TextClassificationModelHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -173,6 +174,26 @@ open class ModelManagerViewModel(
   override fun onCleared() {
     super.onCleared()
     authService.dispose()
+  }
+
+  // Expose Web Search enabled state Flow
+  val isWebSearchEnabledFlow: Flow<Boolean> = dataStoreRepository.isWebSearchEnabledFlow
+
+  // Provide method to update Web Search enabled state
+  fun setIsWebSearchEnabled(isEnabled: Boolean) {
+    viewModelScope.launch {
+      dataStoreRepository.setIsWebSearchEnabled(isEnabled)
+    }
+  }
+
+  // Expose Web Search max results Flow
+  val webSearchMaxResultsFlow: Flow<Int> = dataStoreRepository.webSearchMaxResultsFlow
+
+  // Provide method to update Web Search max results
+  fun setWebSearchMaxResults(count: Int) {
+    viewModelScope.launch {
+      dataStoreRepository.setWebSearchMaxResults(count)
+    }
   }
 
   fun selectModel(model: Model) {

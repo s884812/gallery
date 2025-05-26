@@ -19,16 +19,26 @@ package com.google.ai.edge.gallery.data
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey // Added
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.google.ai.edge.gallery.ui.theme.THEME_AUTO
+import kotlinx.coroutines.flow.Flow // Added
+import kotlinx.coroutines.flow.catch // Added
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map // Added
 import kotlinx.coroutines.runBlocking
+import java.io.IOException // Added for catch block
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -50,7 +60,15 @@ interface DataStoreRepository {
   fun readAccessTokenData(): AccessTokenData?
   fun saveImportedModels(importedModels: List<ImportedModelInfo>)
   fun readImportedModels(): List<ImportedModelInfo>
+
+  val isWebSearchEnabledFlow: Flow<Boolean>
+  suspend fun setIsWebSearchEnabled(isEnabled: Boolean)
+
+  val webSearchMaxResultsFlow: Flow<Int> // Added
+  suspend fun setWebSearchMaxResults(count: Int) // Added
 }
+
+private const val TAG = "DataStoreRepository"
 
 /**
  * Repository for managing data using DataStore, with JSON serialization.
@@ -85,6 +103,11 @@ class DefaultDataStoreRepository(
 
     // Data for all imported models.
     val IMPORTED_MODELS = stringPreferencesKey("imported_models")
+
+    // Key for Web Search enabled state
+    val IS_WEB_SEARCH_ENABLED = booleanPreferencesKey("is_web_search_enabled")
+    // Key for Web Search max results
+    val WEB_SEARCH_MAX_RESULTS = intPreferencesKey("web_search_max_results") // Added
   }
 
   private val keystoreAlias: String = "com_google_aiedge_gallery_access_token_key"
@@ -198,6 +221,44 @@ class DefaultDataStoreRepository(
     val gson = Gson()
     val listType = object : TypeToken<List<String>>() {}.type
     return gson.fromJson(infosStr, listType)
+  }
+
+  override val isWebSearchEnabledFlow: Flow<Boolean> = dataStore.data
+      .catch { exception ->
+          if (exception is IOException) {
+              android.util.Log.e(TAG, "Error reading web search preference.", exception)
+              emit(emptyPreferences())
+          } else {
+              throw exception
+          }
+      }
+      .map { preferences ->
+          preferences[PreferencesKeys.IS_WEB_SEARCH_ENABLED] ?: true // Default to true if not set
+      }
+
+  override suspend fun setIsWebSearchEnabled(isEnabled: Boolean) {
+      dataStore.edit { preferences ->
+          preferences[PreferencesKeys.IS_WEB_SEARCH_ENABLED] = isEnabled
+      }
+  }
+
+  override val webSearchMaxResultsFlow: Flow<Int> = dataStore.data
+      .catch { exception ->
+          if (exception is IOException) {
+              android.util.Log.e(TAG, "Error reading web search max results preference.", exception)
+              emit(emptyPreferences())
+          } else {
+              throw exception
+          }
+      }
+      .map { preferences ->
+          preferences[PreferencesKeys.WEB_SEARCH_MAX_RESULTS] ?: 5 // Default to 5 if not set
+      }
+
+  override suspend fun setWebSearchMaxResults(count: Int) {
+      dataStore.edit { preferences ->
+          preferences[PreferencesKeys.WEB_SEARCH_MAX_RESULTS] = count
+      }
   }
 
   private fun getOrCreateSecretKey(): SecretKey {

@@ -19,6 +19,25 @@ plugins {
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.kotlin.serialization)
+import java.util.Properties
+import java.io.FileInputStream
+import org.gradle.api.Project
+
+}
+
+// Function to get property from local.properties or environment variable
+fun getApiKey(propertyKey: String, project: Project): String {
+    val localProperties = Properties()
+    val localPropertiesFile = project.rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localProperties.load(FileInputStream(localPropertiesFile))
+        val key = localProperties.getProperty(propertyKey)
+        if (key != null) return key
+    }
+    // Fallback to environment variable if not found in local.properties
+    // (You might not need this fallback for this specific case, but it's a common pattern)
+    // return System.getenv(propertyKey.toUpperCase().replace('.', '_')) ?: ""
+    return "" // Return empty string if key is not found, build will fail if it's required later
 }
 
 android {
@@ -37,6 +56,20 @@ android {
     manifestPlaceholders["appAuthRedirectScheme"] = "com.google.ai.edge.gallery.oauth"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    // vectorDrawables { // This block seems to be missing in the original, adding it as per example if needed.
+    //    useSupportLibrary = true
+    // }
+
+    // Define TAVILY_API_KEY as a BuildConfig field
+    // "tavily.apiKey" is the key name in local.properties
+    val tavilyApiKey = getApiKey("tavily.apiKey", project)
+    if (tavilyApiKey.isEmpty()) {
+        // Optionally, throw an error if the API key is mandatory for the build
+        // throw GradleException("Tavily API Key (tavily.apiKey) not found in local.properties. Please add it.")
+        // Or allow build to continue with an empty key, but app might not function fully.
+        println("Warning: Tavily API Key (tavily.apiKey) not found in local.properties. Web search functionality will not work.")
+    }
+    buildConfigField("String", "TAVILY_API_KEY", "\"${tavilyApiKey}\"")
   }
 
   buildTypes {

@@ -42,9 +42,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MultiChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,6 +83,7 @@ import kotlin.math.min
 
 private val THEME_OPTIONS = listOf(THEME_AUTO, THEME_LIGHT, THEME_DARK)
 
+@OptIn(ExperimentalMaterial3Api::class) // Added for ExposedDropdownMenuBox
 @Composable
 fun SettingsDialog(
   curThemeOverride: String,
@@ -88,9 +97,14 @@ fun SettingsDialog(
       .withLocale(Locale.getDefault())
   }
   var customHfToken by remember { mutableStateOf("") }
-  var isFocused by remember { mutableStateOf(false) }
+  var isFocused by remember { mutableStateOF(false) }
   val focusRequester = remember { FocusRequester() }
   val interactionSource = remember { MutableInteractionSource() }
+
+  val isWebSearchEnabled by modelManagerViewModel.isWebSearchEnabledFlow.collectAsState(initial = true)
+  val currentMaxResults by modelManagerViewModel.webSearchMaxResultsFlow.collectAsState(initial = 5)
+  val maxResultsOptions = listOf(3, 5, 10, 20)
+  var expandedDropdown by remember { mutableStateOf(false) }
 
   Dialog(onDismissRequest = onDismissed) {
     val focusManager = LocalFocusManager.current
@@ -150,6 +164,82 @@ fun SettingsDialog(
                   // Save to data store.
                   modelManagerViewModel.saveThemeOverride(label)
                 }, checked = label == selectedTheme, label = { Text(label) })
+              }
+            }
+          }
+
+          // Web Search Toggle
+          Column(
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Text(
+              "Web Search", // Title for the section
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+            )
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .clickable { modelManagerViewModel.setIsWebSearchEnabled(!isWebSearchEnabled) }
+                .padding(vertical = 4.dp), // Consistent padding with other items if possible
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+              Text(
+                "啟用網路搜索",
+                style = MaterialTheme.typography.bodyMedium // Using bodyMedium for consistency
+              )
+              Switch(
+                checked = isWebSearchEnabled,
+                onCheckedChange = { modelManagerViewModel.setIsWebSearchEnabled(it) }
+              )
+            }
+          }
+
+          // Web Search Max Results Dropdown
+          if (isWebSearchEnabled) { // Only show if web search is enabled
+            Column(
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Text(
+                "搜索結果數量上限", // Title: "Max Search Results"
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+              )
+              // Aligned to the right as per the desired UI structure for other settings (like switch)
+              Box(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(top = 4.dp), // Small padding to separate from title
+                contentAlignment = Alignment.CenterEnd // Align dropdown to the end (right)
+              ) {
+                ExposedDropdownMenuBox(
+                  expanded = expandedDropdown,
+                  onExpandedChange = { expandedDropdown = !expandedDropdown },
+                  modifier = Modifier.width(IntrinsicSize.Min) // Wrap content width
+                ) {
+                  OutlinedTextField( // Using OutlinedTextField as per example
+                    value = currentMaxResults.toString(),
+                    onValueChange = { /* Read only */ },
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDropdown) },
+                    modifier = Modifier.menuAnchor(), // Important for M3 ExposedDropdownMenuBox
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    shape = RoundedCornerShape(8.dp) // Consistent shape
+                  )
+                  ExposedDropdownMenu(
+                    expanded = expandedDropdown,
+                    onDismissRequest = { expandedDropdown = false }
+                  ) {
+                    maxResultsOptions.forEach { selectionOption ->
+                      DropdownMenuItem(
+                        text = { Text(selectionOption.toString()) },
+                        onClick = {
+                          modelManagerViewModel.setWebSearchMaxResults(selectionOption)
+                          expandedDropdown = false
+                        }
+                      )
+                    }
+                  }
+                }
               }
             }
           }
