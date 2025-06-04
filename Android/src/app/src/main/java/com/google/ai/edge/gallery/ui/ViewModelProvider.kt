@@ -36,7 +36,6 @@ object ViewModelProvider {
     // Create an instance of WebSearchService
     // This instance will be shared by ViewModels that need it.
     val webSearchService = WebSearchService()
-    // Get DataStoreRepository instance
     val dataStoreRepository = galleryApplication().container.dataStoreRepository
 
     // Initializer for ModelManagerViewModel.
@@ -63,8 +62,8 @@ object ViewModelProvider {
     // Initializer for LlmChatViewModel.
     initializer {
       LlmChatViewModel(
-          webSearchService = webSearchService,
-          dataStoreRepository = dataStoreRepository // Pass it here
+        webSearchService = webSearchService,
+        dataStoreRepository = dataStoreRepository,
       )
     }
 
@@ -78,8 +77,8 @@ object ViewModelProvider {
     // Initializer for LlmAskImageViewModel.
     initializer {
       LlmAskImageViewModel(
-          webSearchService = webSearchService,
-          dataStoreRepository = dataStoreRepository // Pass it here
+        webSearchService = webSearchService,
+        dataStoreRepository = dataStoreRepository,
       )
     }
 

@@ -35,7 +35,7 @@ class WebSearchService {
                     put("query", query)
                     put("search_depth", "basic")
                     put("include_answer", true)
-                    put("max_results", maxResults) // Use the parameter here
+                    put("max_results", maxResults)
                     // include_domains and exclude_domains are empty by default
                 }.toString()
 
