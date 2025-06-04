@@ -217,6 +217,8 @@ enum class ConfigKey(val label: String) {
   THEME("Theme"),
   NAME("Name"),
   MODEL_TYPE("Model type")
+  , ENABLE_WEB_SEARCH("Enable web search"),
+  SEARCH_REQUEST_COUNT("Search request count")
 }
 
 val MOBILENET_CONFIGS: List<Config> = listOf(

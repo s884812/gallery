@@ -53,6 +53,8 @@ open class LlmChatViewModel(
 ) : ChatViewModel(task = curTask) {
   fun generateResponse(model: Model, input: String, image: Bitmap? = null, onError: () -> Unit) {
     val accelerator = model.getStringConfigValue(key = ConfigKey.ACCELERATOR, defaultValue = "")
+    val searchEnabled = model.getBooleanConfigValue(key = ConfigKey.ENABLE_WEB_SEARCH, defaultValue = true)
+    val searchRequestCount = model.getStringConfigValue(key = ConfigKey.SEARCH_REQUEST_COUNT, defaultValue = "1").toIntOrNull() ?: 1
     viewModelScope.launch(Dispatchers.Default) {
       // Web Search Logic
       var augmentedInput = input
@@ -60,56 +62,61 @@ open class LlmChatViewModel(
       var searchSuccessful = false
       var searchErrorOccurred = false
 
-      // Add search in-progress indicator
       val searchIndicatorMessage = ChatMessageText(
         content = "正在為您搜索網路獲取最新資訊...",
         side = ChatSide.AGENT,
         accelerator = accelerator
       )
-      addMessage(model = model, message = searchIndicatorMessage)
 
-      try {
-        val tavilyResponse = webSearchService.search(apiKey = "YOUR_API_KEY", query = input)
-        searchPerformed = true
+      if (searchEnabled) {
+        addMessage(model = model, message = searchIndicatorMessage)
 
-        if (tavilyResponse != null) {
-          searchSuccessful = true
-          val searchAnswer = tavilyResponse.answer
-          val searchResults = tavilyResponse.results
+        try {
+          var aggregatedAnswer: String? = null
+          val aggregatedSnippets = mutableListOf<String>()
+          repeat(searchRequestCount) {
+            val tavilyResponse = webSearchService.search(apiKey = "YOUR_API_KEY", query = input)
+            searchPerformed = true
+            if (tavilyResponse != null) {
+              searchSuccessful = true
+              tavilyResponse.answer?.let { if (aggregatedAnswer == null) aggregatedAnswer = it }
+              tavilyResponse.results?.let { results ->
+                aggregatedSnippets.addAll(results.map { it.content })
+              }
+            } else {
+              searchErrorOccurred = true
+            }
+          }
 
-          if (!searchAnswer.isNullOrBlank()) {
-            augmentedInput = "Based on web search results, answer the following: \"${searchAnswer}\". The original question was: \"${input}\""
-          } else if (!searchResults.isNullOrEmpty()) {
-            val snippets = searchResults.take(2).joinToString(separator = "; ") { it.content }
+          if (!aggregatedAnswer.isNullOrBlank()) {
+            augmentedInput = "Based on web search results, answer the following: \"${aggregatedAnswer}\". The original question was: \"${input}\""
+          } else if (aggregatedSnippets.isNotEmpty()) {
+            val snippets = aggregatedSnippets.take(2).joinToString(separator = "; ")
             if (snippets.isNotBlank()) {
               augmentedInput = "Based on web search results, here are some relevant snippets: \"${snippets}\". The original question was: \"${input}\""
             }
           }
-        } else {
+        } catch (e: Exception) {
+          Log.e(TAG, "Web search call failed", e)
           searchErrorOccurred = true
         }
-      } catch (e: Exception) {
-        Log.e(TAG, "Web search call failed", e)
-        searchErrorOccurred = true
-      }
 
-      // Remove search in-progress indicator
-      val lastMessage = getLastMessage(model = model)
-      if (lastMessage == searchIndicatorMessage) {
+        val lastMessage = getLastMessage(model = model)
+        if (lastMessage == searchIndicatorMessage) {
           removeLastMessage(model = model)
-      }
+        }
 
-      // Add search result status messages
-      if (searchErrorOccurred) {
+        if (searchErrorOccurred) {
           addMessage(
-              model = model,
-              message = ChatMessageWarning(content = "網路搜索失敗，將嘗試使用模型知識回答。")
+            model = model,
+            message = ChatMessageWarning(content = "網路搜索失敗，將嘗試使用模型知識回答。")
           )
-      } else if (searchPerformed && !searchSuccessful) {
+        } else if (searchPerformed && !searchSuccessful) {
           addMessage(
-              model = model,
-              message = ChatMessageWarning(content = "網路搜索未能找到相關資訊，將嘗試使用模型知識回答。")
+            model = model,
+            message = ChatMessageWarning(content = "網路搜索未能找到相關資訊，將嘗試使用模型知識回答。")
           )
+        }
       }
 
       setInProgress(true)
