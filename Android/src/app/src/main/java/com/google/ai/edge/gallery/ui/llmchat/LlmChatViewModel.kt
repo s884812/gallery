@@ -53,21 +53,21 @@ private val STATS = listOf(
 open class LlmChatViewModel(
   curTask: Task = TASK_LLM_CHAT,
   private val webSearchService: WebSearchService,
-  private val dataStoreRepository: DataStoreRepository // New parameter
+  private val dataStoreRepository: DataStoreRepository
 ) : ChatViewModel(task = curTask) {
   fun generateResponse(model: Model, input: String, image: Bitmap? = null, onError: () -> Unit) {
     val accelerator = model.getStringConfigValue(key = ConfigKey.ACCELERATOR, defaultValue = "")
     viewModelScope.launch(Dispatchers.Default) {
       val isWebSearchActuallyEnabled = dataStoreRepository.isWebSearchEnabledFlow.first()
       var augmentedInput = input
-      var searchIndicatorMessage: ChatMessageLoading? = null // Used to remove the message later
+      var searchIndicatorMessage: ChatMessageLoading? = null
 
       if (isWebSearchActuallyEnabled) {
         // --- Start of Web Search Block ---
         searchIndicatorMessage = ChatMessageLoading(
-            text = "正在為您搜索網路獲取最新資訊...",
-            accelerator = accelerator,
-            side = ChatSide.AGENT
+          text = "正在為您搜索網路獲取最新資訊...",
+          accelerator = accelerator,
+          side = ChatSide.AGENT,
         )
         addMessage(model = model, message = searchIndicatorMessage)
 
@@ -83,13 +83,12 @@ open class LlmChatViewModel(
             searchPerformed = true
             searchSuccessful = false
           } else {
-            // Get the stored maxResults value
-            val currentMaxResults = dataStoreRepository.webSearchMaxResultsFlow.first() // Default is 5 from DataStoreRepo
+            val currentMaxResults = dataStoreRepository.webSearchMaxResultsFlow.first()
 
             val tavilyResponse = webSearchService.search(
-                apiKey = apiKey,
-                query = input,
-                maxResults = currentMaxResults // Pass the stored value here
+              apiKey = apiKey,
+              query = input,
+              maxResults = currentMaxResults,
             )
             searchPerformed = true
             if (tavilyResponse != null) {
@@ -106,39 +105,38 @@ open class LlmChatViewModel(
                 }
               }
             } else {
-              searchErrorOccurred = true // Or searchSuccessful = false depending on desired logic for null response
+              searchErrorOccurred = true
             }
           }
         } catch (e: Exception) {
           Log.e(TAG, "Web search call failed with exception", e)
           searchErrorOccurred = true
-          if (!searchPerformed) { // Ensure searchPerformed is true if exception occurs
-              searchPerformed = true
+          if (!searchPerformed) {
+            searchPerformed = true
           }
           searchSuccessful = false
         }
 
-        // Remove search in-progress indicator
         if (searchIndicatorMessage != null) {
-            val lastMessageCheck = getLastMessage(model = model)
-            if (lastMessageCheck == searchIndicatorMessage) {
-                removeLastMessage(model = model)
-            }
+          val lastMessageCheck = getLastMessage(model = model)
+          if (lastMessageCheck == searchIndicatorMessage) {
+            removeLastMessage(model = model)
+          }
         }
-        
-        // Add search result status messages
+
         if (searchErrorOccurred) {
-            addMessage(
-                model = model,
-                message = ChatMessageWarning(content = "網路搜索失敗，將嘗試使用模型知識回答。")
-            )
+          addMessage(
+            model = model,
+            message = ChatMessageWarning(content = "網路搜索失敗，將嘗試使用模型知識回答。"),
+          )
         } else if (searchPerformed && !searchSuccessful) {
-            addMessage(
-                model = model,
-                message = ChatMessageWarning(content = "網路搜索未能找到相關資訊，將嘗試使用模型知識回答。")
-            )
+          addMessage(
+            model = model,
+            message = ChatMessageWarning(content = "網路搜索未能找到相關資訊，將嘗試使用模型知識回答。"),
+          )
         }
         // --- End of Web Search Block ---
+      }
       }
 
       setInProgress(true)
@@ -340,10 +338,11 @@ open class LlmChatViewModel(
 }
 
 class LlmAskImageViewModel(
-    webSearchService: WebSearchService,
-    dataStoreRepository: DataStoreRepository // New parameter
+  webSearchService: WebSearchService,
+  dataStoreRepository: DataStoreRepository,
 ) : LlmChatViewModel(
-    curTask = TASK_LLM_ASK_IMAGE,
-    webSearchService = webSearchService,
-    dataStoreRepository = dataStoreRepository // Pass to super
+  curTask = TASK_LLM_ASK_IMAGE,
+  webSearchService = webSearchService,
+  dataStoreRepository = dataStoreRepository,
 )
+
