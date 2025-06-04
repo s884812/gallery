@@ -67,6 +67,16 @@ fun createLlmChatConfigs(
       key = ConfigKey.ACCELERATOR,
       defaultValue = accelerators[0].label,
       options = accelerators.map { it.label }
+    ),
+    BooleanSwitchConfig(
+      key = ConfigKey.ENABLE_WEB_SEARCH,
+      defaultValue = true,
+      needReinitialization = false,
+    ),
+    SegmentedButtonConfig(
+      key = ConfigKey.SEARCH_REQUEST_COUNT,
+      defaultValue = "1",
+      options = listOf("1", "3", "5", "10"),
     )
   )
 }
